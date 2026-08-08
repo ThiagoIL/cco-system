@@ -1,0 +1,200 @@
+// Prisma schema - CCO RCOND/REDETEL
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- ENUMS ----------
+
+enum PapelUsuario {
+  ADMIN
+  SUPERVISOR
+  TECNICO
+}
+
+enum TipoColaborador {
+  TECNICO
+  TI
+  AJUDANTE
+  ESTAGIARIO
+}
+
+enum StatusColaborador {
+  DISPONIVEL
+  EM_ATENDIMENTO
+  EM_DESLOCAMENTO
+  FOLGA
+}
+
+enum StatusViatura {
+  DISPONIVEL
+  EM_USO
+  MANUTENCAO
+  RESERVA
+}
+
+enum OrigemChamado {
+  WHATSAPP
+  TELEFONE
+  EMAIL
+  APLICATIVO
+  GRUPO_OFICIAL
+  MONITORAMENTO
+}
+
+enum ClassificacaoChamado {
+  P1
+  P2
+  P3
+  P4
+}
+
+enum ClasseSla {
+  A
+  B
+  C
+  D
+}
+
+enum StatusChamado {
+  NOVO
+  PROGRAMADO
+  EM_DESLOCAMENTO
+  EM_ATENDIMENTO
+  PENDENTE_MATERIAL
+  PENDENTE_CLIENTE
+  RETORNO_PROGRAMADO
+  CONCLUIDO
+}
+
+enum StatusPendencia {
+  ABERTA
+  RESOLVIDA
+}
+
+// ---------- MODELS ----------
+
+model User {
+  id           String       @id @default(cuid())
+  nome         String
+  email        String       @unique
+  passwordHash String
+  papel        PapelUsuario @default(TECNICO)
+  ativo        Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  chamadosCriados Chamado[] @relation("ChamadosCriadosPorUsuario")
+
+  @@map("users")
+}
+
+model Colaborador {
+  id        String            @id @default(cuid())
+  nome      String
+  tipo      TipoColaborador
+  status    StatusColaborador @default(DISPONIVEL)
+  ativo     Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  chamados    Chamado[]
+  pendencias  Pendencia[]
+  retornos    Retorno[]
+
+  @@map("colaboradores")
+}
+
+model Viatura {
+  id        String        @id @default(cuid())
+  nome      String        @unique
+  status    StatusViatura @default(DISPONIVEL)
+  ativo     Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  chamados Chamado[]
+
+  @@map("viaturas")
+}
+
+model Chamado {
+  id             String               @id @default(cuid())
+  numero         Int                  @default(autoincrement())
+  cliente        String
+  endereco       String?
+  regiao         String?
+  descricao      String?
+
+  origem         OrigemChamado
+  classificacao  ClassificacaoChamado
+  slaClasse      ClasseSla
+  status         StatusChamado        @default(NOVO)
+
+  dataAbertura   DateTime             @default(now())
+  dataProgramada DateTime?
+  prazoSla       DateTime
+  dataConclusao  DateTime?
+
+  colaboradorId  String?
+  colaborador    Colaborador?         @relation(fields: [colaboradorId], references: [id])
+
+  viaturaId      String?
+  viatura        Viatura?             @relation(fields: [viaturaId], references: [id])
+
+  createdById    String?
+  createdBy      User?                @relation("ChamadosCriadosPorUsuario", fields: [createdById], references: [id])
+
+  pendencias     Pendencia[]
+  retornos       Retorno[]
+
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@index([status])
+  @@index([dataProgramada])
+  @@index([prazoSla])
+  @@map("chamados")
+}
+
+model Pendencia {
+  id             String          @id @default(cuid())
+  chamadoId      String
+  chamado        Chamado         @relation(fields: [chamadoId], references: [id], onDelete: Cascade)
+
+  responsavelId  String
+  responsavel    Colaborador     @relation(fields: [responsavelId], references: [id])
+
+  motivo         String
+  prazo          DateTime
+  dataPrevista   DateTime
+  status         StatusPendencia @default(ABERTA)
+
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@map("pendencias")
+}
+
+model Retorno {
+  id            String      @id @default(cuid())
+  chamadoId     String
+  chamado       Chamado     @relation(fields: [chamadoId], references: [id], onDelete: Cascade)
+
+  motivo        String
+  cliente       String
+  data          DateTime    @default(now())
+
+  colaboradorId String?
+  colaborador   Colaborador? @relation(fields: [colaboradorId], references: [id])
+
+  createdAt     DateTime    @default(now())
+
+  @@map("retornos")
+}

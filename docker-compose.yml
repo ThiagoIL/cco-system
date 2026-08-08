@@ -1,0 +1,44 @@
+# Ambiente de desenvolvimento local com Postgres "de verdade" via Docker.
+# Uso:
+#   docker compose up -d db        # sobe só o banco
+#   npx prisma migrate deploy      # aplica as migrations
+#   npm run dev                    # roda a aplicação localmente (fora do Docker)
+#
+# Ou suba tudo containerizado:
+#   docker compose up --build
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cco
+      POSTGRES_PASSWORD: cco
+      POSTGRES_DB: cco_rcond_redetel
+    ports:
+      - "5432:5432"
+    volumes:
+      - cco_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cco -d cco_rcond_redetel"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://cco:cco@db:5432/cco_rcond_redetel
+      AUTH_SECRET: ${AUTH_SECRET:-dev-secret-change-me}
+      NEXTAUTH_URL: http://localhost:3000
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@rcondredetel.com.br}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-cco@2026admin}
+
+volumes:
+  cco_db_data:
