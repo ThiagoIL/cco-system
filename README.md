@@ -1,164 +1,124 @@
 # CCO — RCOND/REDETEL
 
-Centro de Controle Operacional para gerenciamento em tempo real de chamados,
-técnicos, viaturas, SLA, pendências e retornos.
+Centro de Controle Operacional para gerenciamento em tempo real de chamados, técnicos, viaturas,
+SLA, pendências e retornos (instalação única, sem multi-tenant).
 
-## Stack
+**Stack:** Next.js 16 (App Router, Server Actions) · TypeScript · PostgreSQL · Prisma 7 ·
+Tailwind CSS 4 · NextAuth v5 · Socket.io.
 
-- **Next.js 16** (App Router, TypeScript, Tailwind CSS v4)
-- **PostgreSQL** via **Prisma ORM 7** (driver adapter `@prisma/adapter-pg`, sem engine Rust)
-- **NextAuth (Auth.js) v5** — login com papéis (Administrador / Supervisor / Técnico)
-- **Socket.io** — atualização em tempo real do Dashboard, Programação e Painel de TV
-- Servidor Node customizado (`server.js`) para hospedar o Socket.io junto do Next.js
+> Como a aplicação usa um servidor Node customizado (`server.js`) para hospedar o Socket.io junto do
+> Next.js, ela **não usa** `output: "standalone"` — a imagem Docker carrega o `node_modules` de produção.
+> Isso é intencional.
 
-> ⚠️ Como a aplicação usa um servidor customizado (`server.js`) para o
-> Socket.io, ela **não usa** `output: "standalone"` do Next.js — a imagem
-> Docker carrega o `node_modules` completo. Isso é intencional.
+## Módulos
+
+| Módulo | Rota | O que faz |
+| --- | --- | --- |
+| **Dashboard Operacional** | `/dashboard` | Indicadores do dia: recebidos, concluídos, pendentes, SLA em risco/vencido, equipe e viaturas. Atualiza em tempo real. |
+| **Programação Operacional** | `/programacao` | Atendimentos programados por técnico, região ou data; reatribuição de técnico/viatura. |
+| **Controle de Chamados** | `/chamados` | Cadastro, edição e acompanhamento de chamados, com classe de SLA e semáforo. |
+| **Controle de Pendências** | `/pendencias` | Pendências por chamado (sempre com responsável, motivo e prazo). |
+| **Controle de Retornos** | `/retornos` | Retornos (retrabalho): o chamado volta para a fila e deixa de contar como concluído. |
+| **Mapa Operacional** | `/mapa` | Por colaborador: cliente atual, próximo atendimento, status e viatura. |
+| **Cadastro de Equipes** | `/equipes` | Técnicos, TI, ajudantes e estagiários, com status. |
+| **Cadastro de Viaturas** | `/viaturas` | Frota e status (disponível, em uso, manutenção, reserva). |
+| **Indicadores** | `/indicadores` | Últimos 30 dias: SLA cumprido, backlog, retornos e produtividade por técnico. |
+| **Painel para TV** | `/tv` | Painel em tela cheia com atualização em tempo real. |
+
+### Regras importantes
+
+- **SLA por classe:** A = 2h, B = 4h, C = 8h, D = 24h, contados a partir da abertura. O semáforo fica amarelo
+  quando restam 25% do prazo e vermelho quando vence. Reclassificar o chamado recalcula o prazo.
+- **Retorno reabre o chamado:** registrar um retorno muda o status para *Retorno programado* e limpa a data de conclusão.
+- **Fuso horário:** toda a operação usa `America/Sao_Paulo` (o `server.js` e o Dockerfile fixam o `TZ`).
+- **Papéis** (Administrador / Supervisor / Técnico): hoje funcionam apenas como rótulo — todo usuário logado
+  acessa todos os módulos (veja *Próximos passos*).
 
 ## Rodando localmente
 
-### 1. Banco de dados
-
-Suba um Postgres local com Docker:
+Pré-requisitos: Node 22+ e um PostgreSQL (o `docker-compose.yml` sobe um).
 
 ```bash
-docker compose up -d db
-```
-
-Ou aponte `DATABASE_URL` para qualquer Postgres acessível (local ou remoto).
-
-### 2. Variáveis de ambiente
-
-```bash
-cp .env.example .env
-```
-
-Preencha `DATABASE_URL`, `AUTH_SECRET` (gere com `openssl rand -base64 32`) e,
-opcionalmente, `ADMIN_EMAIL` / `ADMIN_PASSWORD` para o usuário administrador
-criado pelo seed.
-
-### 3. Instalar dependências, migrar e popular o banco
-
-```bash
+cp .env.example .env            # ajuste DATABASE_URL, AUTH_SECRET, NEXTAUTH_URL e ADMIN_*
+docker compose up -d db         # ou use um Postgres seu
 npm install
-npx prisma migrate deploy   # cria as tabelas
-npx prisma db seed          # popula equipe, viaturas e usuário admin
+npx prisma migrate deploy       # aplica as migrations
+npm run dev                     # http://localhost:3000
 ```
 
-### 4. Subir a aplicação
+No primeiro start, o app prepara o banco automaticamente (`src/lib/bootstrap.ts`, executado por
+`src/instrumentation.ts`): cria o administrador (`ADMIN_EMAIL` / `ADMIN_PASSWORD`) quando ainda não há
+usuários e cadastra a equipe e as viaturas iniciais quando esses cadastros estão vazios. O preparo é
+idempotente. O comando `npm run db:seed` executa o mesmo preparo manualmente.
 
-```bash
-npm run dev
-```
+Scripts úteis: `npm run lint`, `npm run typecheck`, `npm run build`, `npm run db:migrate` (criar migration em dev),
+`npm run db:deploy` (aplicar migrations), `npm run db:studio`.
 
-Acesse `http://localhost:3000` e entre com o e-mail/senha do admin exibidos
-no final do `prisma db seed`.
+Para testar a imagem de produção localmente: `docker compose --profile app up --build`.
 
-## Migrations do Prisma — como funcionam
+## Migrations do Prisma
 
-O schema fica em [`prisma/schema.prisma`](prisma/schema.prisma) e cada
-alteração gera um arquivo versionado em `prisma/migrations/`.
+O schema fica em [`prisma/schema.prisma`](prisma/schema.prisma) e cada alteração gera uma pasta versionada em
+`prisma/migrations/`. **Sempre commite as migrations junto da mudança no schema.**
 
-- **Criar uma nova migration** (durante o desenvolvimento, com o banco local
-  acessível):
+- **Criar uma migration** (desenvolvimento, com o banco local acessível):
   ```bash
   npx prisma migrate dev --name descreva_a_mudanca
   ```
-- **Aplicar migrations pendentes** (produção/CI — não gera novos arquivos,
-  só aplica os que já existem no repositório):
-  ```bash
-  npx prisma migrate deploy
-  ```
-- **Popular dados iniciais** (equipe, viaturas, usuário admin):
-  ```bash
-  npx prisma db seed
-  ```
+- **Aplicar as pendentes** (produção/CI — não gera arquivos): `npx prisma migrate deploy`.
+- **Em produção** isso é automático: o container roda `prisma migrate deploy` a cada start, antes de subir o servidor.
 
-Essas migrations ficam versionadas em Git — sempre commitá-las junto da
-mudança no `schema.prisma`.
+## Variáveis de ambiente
 
-## Deploy no EasyPanel
+| Variável | Descrição |
+| --- | --- |
+| `DATABASE_URL` | String de conexão do PostgreSQL. |
+| `AUTH_SECRET` | Segredo da sessão (mín. 32 caracteres). Gere com `openssl rand -base64 48`. |
+| `NEXTAUTH_URL` | URL pública da aplicação (ex.: `https://cco.seudominio.com.br`). |
+| `ADMIN_NAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Administrador inicial (usado só quando não há usuários). |
+| `TZ` | Fuso horário do servidor (`America/Sao_Paulo`). |
+| `PORT` | Porta do servidor (padrão `3000`). |
 
-A ideia é ter **dois serviços separados** dentro do mesmo projeto EasyPanel:
-um Postgres gerenciado e esta aplicação (via Dockerfile) — banco de dados à
-parte da aplicação, como pedido.
+## Deploy no Easypanel
 
-### Passo 1 — Criar o banco de dados
+1. **Banco:** no projeto, crie um serviço **Postgres** (versão 15+). Anote o host interno, usuário, senha e nome do banco.
+2. **App:** crie um serviço do tipo **App** a partir do repositório Git (branch `master`) com **Build → Dockerfile**
+   (o `Dockerfile` está na raiz). Porta do container: **3000**.
+3. **Variáveis de ambiente** do app:
+   ```
+   DATABASE_URL=postgresql://USUARIO:SENHA@HOST_INTERNO:5432/NOME_DO_BANCO
+   AUTH_SECRET=<valor aleatório com 32+ caracteres>
+   NEXTAUTH_URL=https://cco.seudominio.com.br
+   ADMIN_NAME=Administrador CCO
+   ADMIN_EMAIL=<e-mail do administrador>
+   ADMIN_PASSWORD=<senha forte>
+   TZ=America/Sao_Paulo
+   ```
+4. **Domínio/HTTPS:** adicione o domínio na aba *Domains* do serviço (o Easypanel emite o certificado).
+5. **Deploy.** A cada start o container aplica as migrations pendentes (`prisma migrate deploy`) antes de subir o servidor.
+   O endpoint `GET /api/health` serve para o health check.
+6. **Backups:** habilite os backups do serviço Postgres no Easypanel (ou agende `pg_dump`). Todos os dados ficam no banco.
 
-1. No EasyPanel, crie um novo serviço do tipo **Postgres** (Database → Postgres).
-2. Defina usuário, senha e nome do banco.
-3. Copie a **connection string interna** que o EasyPanel gera (algo como
-   `postgres://usuario:senha@nome-do-servico:5432/nome_do_banco`). Serviços
-   dentro do mesmo projeto se enxergam pelo nome do serviço — não é preciso
-   expor o Postgres publicamente.
+> Troque a senha do administrador depois do primeiro acesso e mantenha `AUTH_SECRET` e `ADMIN_PASSWORD`
+> fora do repositório (apenas nas variáveis de ambiente do Easypanel). Ainda não há tela de troca de senha:
+> gere um novo hash e atualize o usuário pelo banco (ou Prisma Studio).
 
-### Passo 2 — Criar o serviço da aplicação
+## Estrutura
 
-1. Crie um novo serviço do tipo **App** apontando para este repositório
-   (Git) — o EasyPanel detecta o `Dockerfile` automaticamente e builda a
-   imagem com ele.
-2. Configure a porta interna como `3000` (a que o `server.js` escuta).
-3. Em **Environment**, defina:
-   - `DATABASE_URL` → a connection string do Passo 1
-   - `AUTH_SECRET` → um valor aleatório (`openssl rand -base64 32`)
-   - `NEXTAUTH_URL` → a URL pública final da aplicação (ex.:
-     `https://cco.seudominio.com.br`)
-   - `ADMIN_EMAIL` / `ADMIN_PASSWORD` → opcionais, usados apenas na primeira
-     execução do seed
-4. Configure o domínio/HTTPS do serviço nas configurações de **Domains** do
-   EasyPanel.
-5. Clique em **Deploy**.
-
-### Passo 3 — Rodar as migrations
-
-O container roda [`docker-entrypoint.sh`](docker-entrypoint.sh), que executa
-automaticamente `npx prisma migrate deploy` **antes** de iniciar o servidor
-a cada deploy — ou seja, novas migrations commitadas no repositório são
-aplicadas sozinhas no próximo deploy, sem passo manual.
-
-Ainda assim, para rodar migrations (ou o seed) manualmente a qualquer
-momento — por exemplo, para popular a equipe/viaturas na primeira vez —
-use o terminal do próprio serviço no EasyPanel (aba **Console/Terminal** do
-app) e rode:
-
-```bash
-npx prisma migrate deploy
-npx prisma db seed
+```
+prisma/            schema, migrations e seed
+server.js          servidor Node customizado (Next.js + Socket.io)
+src/app/(app)/     telas autenticadas (dashboard, chamados, programação…)
+src/app/tv/        painel para TV
+src/app/login/     autenticação
+src/app/api/       NextAuth e health check
+src/lib/           banco, SLA, tempo real, bootstrap, dados dos painéis
+src/components/    componentes de UI
+src/proxy.ts       barreira de acesso (redireciona para /login sem sessão)
 ```
 
-> O `prisma db seed` usa `upsert`, então pode ser rodado mais de uma vez sem
-> duplicar dados.
+## Próximos passos sugeridos
 
-### Atualizações futuras
-
-Sempre que o `schema.prisma` mudar:
-
-1. Localmente: `npx prisma migrate dev --name nome_da_mudanca` (gera o
-   arquivo de migration).
-2. Commit e push do código, incluindo `prisma/migrations/`.
-3. Deploy no EasyPanel — o `docker-entrypoint.sh` aplica a migration
-   automaticamente antes de subir a nova versão.
-
-## Estrutura de módulos
-
-| Módulo | Rota |
-| --- | --- |
-| Dashboard Operacional | `/dashboard` |
-| Programação Operacional | `/programacao` |
-| Controle de Chamados | `/chamados` |
-| Controle de Pendências | `/pendencias` |
-| Controle de Retornos | `/retornos` |
-| Mapa Operacional | `/mapa` |
-| Cadastro de Equipes | `/equipes` |
-| Cadastro de Viaturas | `/viaturas` |
-| Indicadores | `/indicadores` |
-| Painel para TV | `/tv` |
-
-## Login padrão (após o seed)
-
-- **E-mail:** valor de `ADMIN_EMAIL` (padrão `admin@rcondredetel.com.br`)
-- **Senha:** valor de `ADMIN_PASSWORD` (padrão `cco@2026admin`)
-
-**Troque a senha assim que possível** — hoje não há tela de "esqueci minha
-senha"; para trocar, gere um novo hash e atualize o usuário diretamente no
-banco, ou recrie o usuário via Prisma Studio (`npx prisma studio`).
+- Permissões por papel (Administrador / Supervisor / Técnico).
+- Tela para desativar colaboradores/viaturas e gerenciar usuários e senhas.
+- Relatórios e exportação CSV.

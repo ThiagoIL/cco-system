@@ -1,8 +1,8 @@
 #!/bin/sh
 set -e
 
-echo "==> Aplicando migrations pendentes do banco de dados..."
-npx prisma migrate deploy
+echo "[entrypoint] aplicando migrations do banco..."
+node node_modules/prisma/build/index.js migrate deploy
 
-echo "==> Iniciando aplicação..."
-exec "$@"
+echo "[entrypoint] iniciando o servidor na porta ${PORT:-3000}..."
+exec node server.js

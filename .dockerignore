@@ -2,9 +2,12 @@ node_modules
 .next
 .git
 .env
-.env.local
-npm-debug.log*
-src/generated
+.env.*
+!.env.example
+Dockerfile
+docker-compose.yml
+README.md
 .claude
 .windsurf
 .agents
+src/generated

@@ -1,45 +1,42 @@
-# Ambiente de desenvolvimento local com Postgres "de verdade" via Docker.
-# Uso:
-#   docker compose up -d db        # sobe só o banco
-#   npx prisma migrate deploy      # aplica as migrations
-#   npm run dev                    # roda a aplicação localmente (fora do Docker)
+# Ambiente local. Em produção (Easypanel) o Postgres é um serviço do próprio painel.
 #
-# Ou suba tudo containerizado:
-#   docker compose up --build
+#   docker compose up -d db          # só o banco (desenvolvimento com `npm run dev`)
+#   docker compose --profile app up  # banco + app em container (teste da imagem de produção)
 
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: cco
-      POSTGRES_PASSWORD: cco
-      POSTGRES_DB: cco_rcond_redetel
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: cco
     ports:
       - "5432:5432"
     volumes:
-      - cco_db_data:/var/lib/postgresql/data
+      - cco-db:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cco -d cco_rcond_redetel"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d cco"]
       interval: 5s
       timeout: 5s
       retries: 10
 
   app:
+    profiles: ["app"]
     build: .
-    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - "3000:3000"
     environment:
-      DATABASE_URL: postgres://cco:cco@db:5432/cco_rcond_redetel
-      AUTH_SECRET: ${AUTH_SECRET:-dev-secret-change-me}
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/cco
+      AUTH_SECRET: ${AUTH_SECRET:-troque-por-um-valor-aleatorio-com-pelo-menos-32-caracteres}
+      ADMIN_NAME: ${ADMIN_NAME:-Administrador CCO}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@rcondredetel.com.br}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-troque-esta-senha}
       NEXTAUTH_URL: http://localhost:3000
       TZ: America/Sao_Paulo
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@rcondredetel.com.br}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-cco@2026admin}
+    ports:
+      - "3000:3000"
 
 volumes:
-  cco_db_data:
+  cco-db:

@@ -4,6 +4,8 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  // A app roda atrás do proxy reverso do Easypanel (HTTPS terminado fora do container).
+  trustHost: true,
   session: { strategy: "jwt" },
   pages: {
     signIn: "/login",
