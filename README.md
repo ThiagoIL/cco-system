@@ -14,21 +14,25 @@ Tailwind CSS 4 · NextAuth v5 · Socket.io.
 
 | Módulo | Rota | O que faz |
 | --- | --- | --- |
-| **Dashboard Operacional** | `/dashboard` | Indicadores do dia: recebidos, concluídos, pendentes, SLA em risco/vencido, equipe e viaturas. Atualiza em tempo real. |
-| **Programação Operacional** | `/programacao` | Atendimentos programados por técnico, região ou data; reatribuição de técnico/viatura. |
+| **Dashboard Operacional** | `/dashboard` | Em tempo real: recebidos/concluídos do dia, pendentes, retornos, SLA em risco/vencido, backlog, **fila de atenção** (chamados mais urgentes), gráficos por status/prioridade e dos últimos 7 dias, quadro de técnicos e de viaturas. |
+| **Programação Operacional** | `/programacao` | Quadro com **arrastar e soltar**. Visões: por técnico (soltar atribui o técnico e programa o dia), por equipe (somente leitura), por região e por data (semana: soltar muda o dia, mantendo o horário). Coluna "Sem data" para programar pendências, troca de viatura no próprio cartão e navegação por dia. |
 | **Controle de Chamados** | `/chamados` | Cadastro, edição e acompanhamento de chamados, com classe de SLA e semáforo. |
 | **Controle de Pendências** | `/pendencias` | Pendências por chamado (sempre com responsável, motivo e prazo). |
 | **Controle de Retornos** | `/retornos` | Retornos (retrabalho): o chamado volta para a fila e deixa de contar como concluído. |
-| **Mapa Operacional** | `/mapa` | Por colaborador: cliente atual, próximo atendimento, status e viatura. |
+| **Mapa Operacional** | `/mapa` | Por colaborador: cliente atual (com SLA), próximo atendimento, status, viatura e região; filtro por equipe. |
 | **Cadastro de Equipes** | `/equipes` | Técnicos, TI, ajudantes e estagiários, com status. |
 | **Cadastro de Viaturas** | `/viaturas` | Frota e status (disponível, em uso, manutenção, reserva). |
-| **Indicadores** | `/indicadores` | Últimos 30 dias: SLA cumprido, backlog, retornos e produtividade por técnico. |
-| **Painel para TV** | `/tv` | Painel em tela cheia com atualização em tempo real. |
+| **Indicadores** | `/indicadores` | Período de 7/30/90 dias. Operação (SLA, SLA por classe, backlog, retornos, produtividade), **supervisores** (produtividade, SLA e pendências por equipe) e técnicos (OS concluídas, tempo médio, horas produtivas, retornos gerados). |
+| **Painel para TV** | `/tv` | Modo TV com relógio e tela cheia, atualização automática: programação do dia (com SLA), equipes em campo, pendências críticas, SLA e backlog. |
 
 ### Regras importantes
 
 - **SLA por classe:** A = 2h, B = 4h, C = 8h, D = 24h, contados a partir da abertura. O semáforo fica amarelo
   quando restam 25% do prazo e vermelho quando vence. Reclassificar o chamado recalcula o prazo.
+- **Recursos acompanham o chamado:** chamado "Em atendimento"/"Em deslocamento" coloca o técnico no mesmo status
+  e a viatura "Em uso"; ao sair de campo eles voltam a "Disponível" (Folga, Manutenção e Reserva nunca são
+  alteradas automaticamente). O status também pode ser ajustado manualmente em Equipes e Viaturas.
+- **Equipes** são os grupos do cadastro: Técnicos, TI, Ajudantes e Estagiários.
 - **Retorno reabre o chamado:** registrar um retorno muda o status para *Retorno programado* e limpa a data de conclusão.
 - **Fuso horário:** toda a operação usa `America/Sao_Paulo` (o `server.js` e o Dockerfile fixam o `TZ`).
 - **Papéis** (Administrador / Supervisor / Técnico): hoje funcionam apenas como rótulo — todo usuário logado

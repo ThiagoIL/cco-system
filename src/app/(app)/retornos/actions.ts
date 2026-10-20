@@ -4,6 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { emitRealtime } from "@/lib/realtime";
+import { sincronizarRecursos } from "@/lib/recursos";
 import { isDataValida, toErrorMessage, type ActionState } from "@/lib/action-result";
 
 const retornoSchema = z.object({
@@ -30,7 +31,7 @@ export async function createRetorno(
     // Retornos representam retrabalho: o chamado volta para a fila e deixa de
     // ser considerado concluído (por isso a dataConclusao é limpa). Tudo na
     // mesma transação para não deixar o chamado num estado intermediário.
-    await prisma.$transaction([
+    const [, chamado] = await prisma.$transaction([
       prisma.retorno.create({
         data: {
           chamadoId: data.chamadoId,
@@ -45,6 +46,11 @@ export async function createRetorno(
         data: { status: "RETORNO_PROGRAMADO", dataConclusao: null },
       }),
     ]);
+    // O chamado deixou de estar em campo: libera técnico e viatura.
+    await sincronizarRecursos({
+      colaboradores: [chamado.colaboradorId],
+      viaturas: [chamado.viaturaId],
+    });
   } catch (error) {
     return { error: toErrorMessage(error) };
   }

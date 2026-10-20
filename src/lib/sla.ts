@@ -45,3 +45,22 @@ export const SLA_CLASSE_LABEL: Record<ClasseSla, string> = {
   C: "Classe C (até 8h)",
   D: "Classe D (até 24h)",
 };
+
+/** Texto curto do tempo de SLA: "1h 20min restantes", "vencido há 35min", "concluído no prazo". */
+export function tempoRestanteSla(
+  prazoSla: Date,
+  dataConclusao?: Date | null,
+  agora: Date = new Date()
+): string {
+  const referencia = dataConclusao ?? agora;
+  const diffMin = Math.round((prazoSla.getTime() - referencia.getTime()) / 60000);
+  const abs = Math.abs(diffMin);
+  const horas = Math.floor(abs / 60);
+  const minutos = abs % 60;
+  const texto = horas > 0 ? `${horas}h ${String(minutos).padStart(2, "0")}min` : `${minutos}min`;
+
+  if (dataConclusao) {
+    return diffMin >= 0 ? "concluído no prazo" : `concluído com ${texto} de atraso`;
+  }
+  return diffMin >= 0 ? `${texto} restantes` : `vencido há ${texto}`;
+}

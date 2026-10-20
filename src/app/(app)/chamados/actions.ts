@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { calcularPrazoSla } from "@/lib/sla";
 import { emitRealtime } from "@/lib/realtime";
+import { sincronizarRecursos } from "@/lib/recursos";
 import { toErrorMessage, type ActionState } from "@/lib/action-result";
 import { chamadoSchema } from "./schema";
 
@@ -59,6 +60,10 @@ export async function createChamado(
       },
     });
     chamadoId = chamado.id;
+    await sincronizarRecursos({
+      colaboradores: [chamado.colaboradorId],
+      viaturas: [chamado.viaturaId],
+    });
   } catch (error) {
     return { error: toErrorMessage(error) };
   }
@@ -88,7 +93,7 @@ export async function updateChamado(
     const dataConclusao =
       data.status === "CONCLUIDO" ? (atual.dataConclusao ?? new Date()) : null;
 
-    await prisma.chamado.update({
+    const atualizado = await prisma.chamado.update({
       where: { id },
       data: {
         cliente: data.cliente,
@@ -106,6 +111,11 @@ export async function updateChamado(
         viaturaId: data.viaturaId ?? null,
       },
     });
+    // Reavalia quem saiu do chamado e quem entrou.
+    await sincronizarRecursos({
+      colaboradores: [atual.colaboradorId, atualizado.colaboradorId],
+      viaturas: [atual.viaturaId, atualizado.viaturaId],
+    });
   } catch (error) {
     return { error: toErrorMessage(error) };
   }
@@ -118,8 +128,18 @@ export async function updateChamado(
 }
 
 export async function deleteChamado(id: string) {
+  const existente = await prisma.chamado.findUnique({
+    where: { id },
+    select: { colaboradorId: true, viaturaId: true },
+  });
   // deleteMany não falha se o chamado já foi removido (ex.: duplo clique).
   await prisma.chamado.deleteMany({ where: { id } });
+  if (existente) {
+    await sincronizarRecursos({
+      colaboradores: [existente.colaboradorId],
+      viaturas: [existente.viaturaId],
+    });
+  }
   emitRealtime("chamados:changed");
   revalidatePath("/chamados");
   revalidatePath("/dashboard");

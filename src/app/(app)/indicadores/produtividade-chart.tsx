@@ -30,7 +30,7 @@ export function ProdutividadeChart({
         <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
         <Tooltip
           contentStyle={{ fontSize: 12, borderRadius: 8 }}
-          formatter={(value) => [`${value} OS`, "Concluídas (30d)"]}
+          formatter={(value) => [`${value} OS`, "Concluídas"]}
         />
         <Bar dataKey="osConcluidas" fill="#3b82f6" radius={[4, 4, 0, 0]} />
       </BarChart>

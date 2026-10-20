@@ -14,6 +14,7 @@ import {
   STATUS_CHAMADO_COLOR,
 } from "@/lib/labels";
 import { formatDateHora } from "@/lib/utils";
+import { tempoRestanteSla } from "@/lib/sla";
 import type { StatusChamado } from "@/generated/prisma/enums";
 
 export default async function ChamadosPage(props: PageProps<"/chamados">) {
@@ -110,6 +111,9 @@ export default async function ChamadosPage(props: PageProps<"/chamados">) {
                 </td>
                 <td className="px-4 py-2">
                   <SemaforoDot semaforo={c.semaforo} />
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {tempoRestanteSla(c.prazoSla, c.dataConclusao)}
+                  </p>
                 </td>
                 <td className="px-4 py-2">{c.colaborador?.nome ?? "—"}</td>
                 <td className="px-4 py-2">{c.viatura?.nome ?? "—"}</td>
