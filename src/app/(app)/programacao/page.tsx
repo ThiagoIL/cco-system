@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { format } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -25,7 +26,7 @@ function paramStr(v: string | string[] | undefined, fallback: string) {
 
 export default async function ProgramacaoPage(props: PageProps<"/programacao">) {
   const searchParams = await props.searchParams;
-  const dataStr = paramStr(searchParams?.data, new Date().toISOString().slice(0, 10));
+  const dataStr = paramStr(searchParams?.data, format(new Date(), "yyyy-MM-dd"));
   const agrupar = paramStr(searchParams?.agrupar, "tecnico") as Agrupamento;
 
   const inicio = new Date(`${dataStr}T00:00:00`);

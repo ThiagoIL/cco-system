@@ -4,42 +4,56 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { emitRealtime } from "@/lib/realtime";
+import { isDataValida, toErrorMessage, type ActionState } from "@/lib/action-result";
 
 const retornoSchema = z.object({
   chamadoId: z.string().min(1),
-  motivo: z.string().min(1, "Informe o motivo do retorno"),
-  cliente: z.string().min(1, "Informe o cliente"),
-  data: z.string().min(1, "Informe a data"),
+  motivo: z.string().trim().min(1, "Informe o motivo do retorno"),
+  cliente: z.string().trim().min(1, "Informe o cliente"),
+  data: z.string().min(1, "Informe a data").refine(isDataValida, "Data inválida"),
   colaboradorId: z.string().optional(),
 });
 
-export async function createRetorno(formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const data = retornoSchema.parse({
-    ...raw,
-    colaboradorId: raw.colaboradorId || undefined,
-  });
+export async function createRetorno(
+  _state: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  let chamadoId: string;
+  try {
+    const raw = Object.fromEntries(formData.entries());
+    const data = retornoSchema.parse({
+      ...raw,
+      colaboradorId: raw.colaboradorId || undefined,
+    });
+    chamadoId = data.chamadoId;
 
-  await prisma.retorno.create({
-    data: {
-      chamadoId: data.chamadoId,
-      motivo: data.motivo,
-      cliente: data.cliente,
-      data: new Date(data.data),
-      colaboradorId: data.colaboradorId ?? null,
-    },
-  });
-
-  // Retornos represent rework, so we route the call back into the queue.
-  await prisma.chamado.update({
-    where: { id: data.chamadoId },
-    data: { status: "RETORNO_PROGRAMADO" },
-  });
+    // Retornos representam retrabalho: o chamado volta para a fila e deixa de
+    // ser considerado concluído (por isso a dataConclusao é limpa). Tudo na
+    // mesma transação para não deixar o chamado num estado intermediário.
+    await prisma.$transaction([
+      prisma.retorno.create({
+        data: {
+          chamadoId: data.chamadoId,
+          motivo: data.motivo,
+          cliente: data.cliente,
+          data: new Date(data.data),
+          colaboradorId: data.colaboradorId ?? null,
+        },
+      }),
+      prisma.chamado.update({
+        where: { id: data.chamadoId },
+        data: { status: "RETORNO_PROGRAMADO", dataConclusao: null },
+      }),
+    ]);
+  } catch (error) {
+    return { error: toErrorMessage(error) };
+  }
 
   emitRealtime("retornos:changed");
   emitRealtime("chamados:changed");
-  revalidatePath(`/chamados/${data.chamadoId}`);
+  revalidatePath(`/chamados/${chamadoId}`);
   revalidatePath("/retornos");
   revalidatePath("/chamados");
   revalidatePath("/dashboard");
+  return null;
 }

@@ -37,6 +37,7 @@ services:
       DATABASE_URL: postgres://cco:cco@db:5432/cco_rcond_redetel
       AUTH_SECRET: ${AUTH_SECRET:-dev-secret-change-me}
       NEXTAUTH_URL: http://localhost:3000
+      TZ: America/Sao_Paulo
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@rcondredetel.com.br}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-cco@2026admin}
 

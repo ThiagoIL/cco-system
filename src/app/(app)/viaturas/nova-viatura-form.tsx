@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ActionForm } from "@/components/ui/action-form";
 import { Input, Label } from "@/components/ui/field";
 import { createViatura } from "./actions";
 
@@ -18,11 +19,9 @@ export function NovaViaturaForm() {
   }
 
   return (
-    <form
-      action={async (formData) => {
-        await createViatura(formData);
-        setOpen(false);
-      }}
+    <ActionForm
+      action={createViatura}
+      onSuccess={() => setOpen(false)}
       className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
     >
       <div>
@@ -33,6 +32,6 @@ export function NovaViaturaForm() {
       <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
         <X className="size-4" /> Cancelar
       </Button>
-    </form>
+    </ActionForm>
   );
 }

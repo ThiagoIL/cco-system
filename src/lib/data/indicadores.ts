@@ -7,39 +7,31 @@ export async function indicadoresOperacao() {
   const inicioHoje = new Date();
   inicioHoje.setHours(0, 0, 0, 0);
 
-  const [concluidos30d, retornos30d, backlog, concluidosNoPrazo] = await Promise.all([
-    prisma.chamado.count({ where: { dataConclusao: { gte: desde } } }),
+  const [retornos30d, backlog, concluidosDetalhe] = await Promise.all([
     prisma.retorno.count({ where: { data: { gte: desde } } }),
     prisma.chamado.count({
       where: { status: { notIn: ["CONCLUIDO"] }, dataAbertura: { lt: inicioHoje } },
     }),
-    prisma.chamado.count({
-      where: {
-        dataConclusao: { gte: desde },
-        // dataConclusao <= prazoSla (cumprido)
-      },
+    // SLA cumprido é calculado em memória (comparação entre duas colunas).
+    prisma.chamado.findMany({
+      where: { dataConclusao: { gte: desde } },
+      select: { dataConclusao: true, prazoSla: true },
     }),
   ]);
-
-  // SLA cumprido calculado em memória (comparação entre duas colunas).
-  const concluidosDetalhe = await prisma.chamado.findMany({
-    where: { dataConclusao: { gte: desde } },
-    select: { dataConclusao: true, prazoSla: true },
-  });
   const cumpridos = concluidosDetalhe.filter(
     (c) => c.dataConclusao && c.dataConclusao <= c.prazoSla
   ).length;
+  // Sem chamados concluídos no período não há SLA a medir (null, não 100%).
   const slaPercentual =
     concluidosDetalhe.length > 0
       ? Math.round((cumpridos / concluidosDetalhe.length) * 100)
-      : 100;
+      : null;
 
   return {
-    concluidos30d,
+    concluidos30d: concluidosDetalhe.length,
     retornos30d,
     backlog,
     slaPercentual,
-    totalConcluidosDetalhe: concluidosNoPrazo,
   };
 }
 

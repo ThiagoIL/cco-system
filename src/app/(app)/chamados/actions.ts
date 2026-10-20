@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { calcularPrazoSla } from "@/lib/sla";
 import { emitRealtime } from "@/lib/realtime";
+import { toErrorMessage, type ActionState } from "@/lib/action-result";
 import { chamadoSchema } from "./schema";
 
 function parseForm(formData: FormData) {
@@ -18,70 +19,96 @@ function parseForm(formData: FormData) {
   });
 }
 
-export async function createChamado(formData: FormData) {
-  const session = await auth();
-  const data = parseForm(formData);
+export async function createChamado(
+  _state: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  let chamadoId: string;
+  try {
+    const session = await auth();
+    const data = parseForm(formData);
 
-  const dataAbertura = new Date();
-  const prazoSla = calcularPrazoSla(dataAbertura, data.slaClasse);
+    // Se o usuário da sessão foi removido do banco, o chamado ainda pode ser
+    // criado — só fica sem autor registrado.
+    const autor = session?.user?.id
+      ? await prisma.user.findUnique({
+          where: { id: session.user.id },
+          select: { id: true },
+        })
+      : null;
 
-  const chamado = await prisma.chamado.create({
-    data: {
-      cliente: data.cliente,
-      endereco: data.endereco || null,
-      regiao: data.regiao || null,
-      descricao: data.descricao || null,
-      origem: data.origem,
-      classificacao: data.classificacao,
-      slaClasse: data.slaClasse,
-      status: data.status,
-      dataAbertura,
-      prazoSla,
-      dataProgramada: data.dataProgramada ? new Date(data.dataProgramada) : null,
-      colaboradorId: data.colaboradorId ?? null,
-      viaturaId: data.viaturaId ?? null,
-      createdById: session?.user?.id,
-    },
-  });
+    const dataAbertura = new Date();
+    const prazoSla = calcularPrazoSla(dataAbertura, data.slaClasse);
+
+    const chamado = await prisma.chamado.create({
+      data: {
+        cliente: data.cliente,
+        endereco: data.endereco || null,
+        regiao: data.regiao || null,
+        descricao: data.descricao || null,
+        origem: data.origem,
+        classificacao: data.classificacao,
+        slaClasse: data.slaClasse,
+        status: data.status,
+        dataAbertura,
+        prazoSla,
+        dataProgramada: data.dataProgramada ? new Date(data.dataProgramada) : null,
+        colaboradorId: data.colaboradorId ?? null,
+        viaturaId: data.viaturaId ?? null,
+        createdById: autor?.id,
+      },
+    });
+    chamadoId = chamado.id;
+  } catch (error) {
+    return { error: toErrorMessage(error) };
+  }
 
   emitRealtime("chamados:changed");
   revalidatePath("/chamados");
   revalidatePath("/dashboard");
-  redirect(`/chamados/${chamado.id}`);
+  redirect(`/chamados/${chamadoId}`);
 }
 
-export async function updateChamado(id: string, formData: FormData) {
-  const data = parseForm(formData);
+export async function updateChamado(
+  id: string,
+  _state: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  try {
+    const data = parseForm(formData);
 
-  const atual = await prisma.chamado.findUniqueOrThrow({ where: { id } });
+    const atual = await prisma.chamado.findUniqueOrThrow({ where: { id } });
 
-  // Reclassificar o SLA recalcula o prazo a partir da abertura original.
-  const prazoSla =
-    data.slaClasse !== atual.slaClasse
-      ? calcularPrazoSla(atual.dataAbertura, data.slaClasse)
-      : atual.prazoSla;
+    // Reclassificar o SLA recalcula o prazo a partir da abertura original.
+    const prazoSla =
+      data.slaClasse !== atual.slaClasse
+        ? calcularPrazoSla(atual.dataAbertura, data.slaClasse)
+        : atual.prazoSla;
 
-  const dataConclusao =
-    data.status === "CONCLUIDO" ? (atual.dataConclusao ?? new Date()) : null;
+    const dataConclusao =
+      data.status === "CONCLUIDO" ? (atual.dataConclusao ?? new Date()) : null;
 
-  await prisma.chamado.update({
-    where: { id },
-    data: {
-      cliente: data.cliente,
-      endereco: data.endereco || null,
-      regiao: data.regiao || null,
-      descricao: data.descricao || null,
-      origem: data.origem,
-      classificacao: data.classificacao,
-      slaClasse: data.slaClasse,
-      status: data.status,
-      prazoSla,
-      dataConclusao,
-      dataProgramada: data.dataProgramada ? new Date(data.dataProgramada) : null,
-      colaboradorId: data.colaboradorId ?? null,
-      viaturaId: data.viaturaId ?? null,
-    },
-  });
+    await prisma.chamado.update({
+      where: { id },
+      data: {
+        cliente: data.cliente,
+        endereco: data.endereco || null,
+        regiao: data.regiao || null,
+        descricao: data.descricao || null,
+        origem: data.origem,
+        classificacao: data.classificacao,
+        slaClasse: data.slaClasse,
+        status: data.status,
+        prazoSla,
+        dataConclusao,
+        dataProgramada: data.dataProgramada ? new Date(data.dataProgramada) : null,
+        colaboradorId: data.colaboradorId ?? null,
+        viaturaId: data.viaturaId ?? null,
+      },
+    });
+  } catch (error) {
+    return { error: toErrorMessage(error) };
+  }
 
   emitRealtime("chamados:changed");
   revalidatePath("/chamados");
@@ -91,7 +118,8 @@ export async function updateChamado(id: string, formData: FormData) {
 }
 
 export async function deleteChamado(id: string) {
-  await prisma.chamado.delete({ where: { id } });
+  // deleteMany não falha se o chamado já foi removido (ex.: duplo clique).
+  await prisma.chamado.deleteMany({ where: { id } });
   emitRealtime("chamados:changed");
   revalidatePath("/chamados");
   revalidatePath("/dashboard");

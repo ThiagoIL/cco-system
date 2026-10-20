@@ -1,4 +1,6 @@
 import { Button } from "@/components/ui/button";
+import { ActionForm } from "@/components/ui/action-form";
+import type { ActionState } from "@/lib/action-result";
 import { Input, Label, Select, Textarea } from "@/components/ui/field";
 import {
   ORIGEM_LABEL,
@@ -36,14 +38,14 @@ export function ChamadoForm({
   chamado,
   submitLabel = "Salvar",
 }: {
-  action: (formData: FormData) => void | Promise<void>;
+  action: (state: ActionState, formData: FormData) => Promise<ActionState>;
   colaboradores: Colaborador[];
   viaturas: Viatura[];
   chamado?: ChamadoValues;
   submitLabel?: string;
 }) {
   return (
-    <form action={action} className="space-y-5">
+    <ActionForm action={action} className="space-y-5">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
           <Label htmlFor="cliente">Cliente</Label>
@@ -155,6 +157,6 @@ export function ChamadoForm({
       </div>
 
       <Button type="submit">{submitLabel}</Button>
-    </form>
+    </ActionForm>
   );
 }

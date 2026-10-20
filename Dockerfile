@@ -21,6 +21,9 @@ FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV TZ=America/Sao_Paulo
+
+RUN apk add --no-cache tzdata
 
 RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
 

@@ -4,6 +4,10 @@ import { Sidebar } from "./sidebar";
 import { SignOutButton } from "./sign-out-button";
 import { PAPEL_USUARIO_LABEL } from "@/lib/labels";
 
+// Sempre renderizado sob demanda: as páginas leem o banco e a sessão a cada
+// requisição, então não devem ser pré-renderizadas durante o `next build`.
+export const dynamic = "force-dynamic";
+
 export default async function AppLayout({
   children,
 }: {

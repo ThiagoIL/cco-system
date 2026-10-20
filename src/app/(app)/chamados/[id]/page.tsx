@@ -7,7 +7,8 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmButton } from "@/components/ui/confirm-button";
-import { Input, Label, Select, Textarea } from "@/components/ui/field";
+import { Input, Label, Select } from "@/components/ui/field";
+import { ActionForm } from "@/components/ui/action-form";
 import { SemaforoDot } from "@/components/semaforo-dot";
 import { ChamadoForm } from "../chamado-form";
 import { updateChamado, deleteChamado } from "../actions";
@@ -60,7 +61,10 @@ export default async function ChamadoDetailPage(
       <Card>
         <CardHeader title="Dados do chamado" />
         <div className="p-4">
+          {/* A key faz o formulário remontar quando o chamado muda no servidor
+              (ex.: um retorno reabre o chamado), evitando mostrar status antigo. */}
           <ChamadoForm
+            key={`${chamado.status}-${chamado.updatedAt.getTime()}`}
             action={updateAction}
             colaboradores={colaboradores}
             viaturas={viaturas}
@@ -111,7 +115,7 @@ export default async function ChamadoDetailPage(
             <p className="p-4 text-sm text-slate-400">Nenhuma pendência registrada.</p>
           )}
         </div>
-        <form action={createPendencia} className="grid grid-cols-1 gap-3 border-t border-slate-200 p-4 sm:grid-cols-2 dark:border-slate-800">
+        <ActionForm action={createPendencia} resetOnSuccess className="grid grid-cols-1 gap-3 border-t border-slate-200 p-4 sm:grid-cols-2 dark:border-slate-800">
           <input type="hidden" name="chamadoId" value={chamado.id} />
           <div className="sm:col-span-2">
             <Label htmlFor="p-motivo">Motivo</Label>
@@ -143,7 +147,7 @@ export default async function ChamadoDetailPage(
               Adicionar pendência
             </Button>
           </div>
-        </form>
+        </ActionForm>
       </Card>
 
       <Card>
@@ -164,7 +168,7 @@ export default async function ChamadoDetailPage(
             <p className="p-4 text-sm text-slate-400">Nenhum retorno registrado.</p>
           )}
         </div>
-        <form action={createRetorno} className="grid grid-cols-1 gap-3 border-t border-slate-200 p-4 sm:grid-cols-2 dark:border-slate-800">
+        <ActionForm action={createRetorno} resetOnSuccess className="grid grid-cols-1 gap-3 border-t border-slate-200 p-4 sm:grid-cols-2 dark:border-slate-800">
           <input type="hidden" name="chamadoId" value={chamado.id} />
           <div className="sm:col-span-2">
             <Label htmlFor="r-motivo">Motivo do retorno</Label>
@@ -194,7 +198,7 @@ export default async function ChamadoDetailPage(
               Registrar retorno
             </Button>
           </div>
-        </form>
+        </ActionForm>
       </Card>
 
       <form action={deleteAction} className="flex justify-end">

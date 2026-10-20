@@ -29,9 +29,15 @@ export default async function IndicadoresPage() {
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
         <StatCard
           label="SLA cumprido"
-          value={`${operacao.slaPercentual}%`}
+          value={operacao.slaPercentual === null ? "—" : `${operacao.slaPercentual}%`}
           icon={Gauge}
-          tone={operacao.slaPercentual >= 90 ? "success" : "warning"}
+          tone={
+            operacao.slaPercentual === null
+              ? "default"
+              : operacao.slaPercentual >= 90
+                ? "success"
+                : "warning"
+          }
         />
         <StatCard label="Backlog" value={operacao.backlog} icon={Layers} tone="danger" />
         <StatCard label="Retornos (30d)" value={operacao.retornos30d} icon={RotateCcw} />

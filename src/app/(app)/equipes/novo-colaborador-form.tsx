@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ActionForm } from "@/components/ui/action-form";
 import { Input, Label, Select } from "@/components/ui/field";
 import { TIPO_COLABORADOR_LABEL } from "@/lib/labels";
 import { createColaborador } from "./actions";
@@ -19,11 +20,9 @@ export function NovoColaboradorForm() {
   }
 
   return (
-    <form
-      action={async (formData) => {
-        await createColaborador(formData);
-        setOpen(false);
-      }}
+    <ActionForm
+      action={createColaborador}
+      onSuccess={() => setOpen(false)}
       className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
     >
       <div>
@@ -45,6 +44,6 @@ export function NovoColaboradorForm() {
       <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
         <X className="size-4" /> Cancelar
       </Button>
-    </form>
+    </ActionForm>
   );
 }

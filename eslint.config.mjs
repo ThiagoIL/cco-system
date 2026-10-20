@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Servidor Node customizado (CommonJS) — não passa pelo bundler do Next.
+    "server.js",
+    "src/generated/**",
   ]),
 ]);
 

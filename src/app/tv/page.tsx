@@ -7,6 +7,10 @@ import { AutoRefreshInterval } from "@/components/auto-refresh-interval";
 import { STATUS_CHAMADO_LABEL, STATUS_COLABORADOR_LABEL } from "@/lib/labels";
 import { formatHora } from "@/lib/utils";
 
+// Sempre renderizado sob demanda: as páginas leem o banco e a sessão a cada
+// requisição, então não devem ser pré-renderizadas durante o `next build`.
+export const dynamic = "force-dynamic";
+
 export default async function PainelTvPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");

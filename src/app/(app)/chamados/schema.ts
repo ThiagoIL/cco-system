@@ -27,7 +27,10 @@ export const chamadoSchema = z.object({
   ]),
   colaboradorId: z.string().optional(),
   viaturaId: z.string().optional(),
-  dataProgramada: z.string().optional(),
+  dataProgramada: z
+    .string()
+    .optional()
+    .refine((v) => !v || !Number.isNaN(new Date(v).getTime()), "Data programada inválida"),
 });
 
 export type ChamadoInput = z.infer<typeof chamadoSchema>;
